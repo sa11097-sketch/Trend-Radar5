@@ -2,62 +2,54 @@
 import os
 import sys
 import argparse
-import yaml
-import traceback
 
-# 强制路径：确保能找到 api 文件夹
+# 强制将当前目录加入路径，确保能找到 api 文件夹
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from api.ai_analyzer import analyze_and_rank
 from api.email_sender import send_email
 
-# --- 调试导入逻辑 ---
-print(">>> DEBUG: 当前目录下的文件列表:")
-print(os.listdir('.'))
-
-HAS_ANALYZER = False
-try:
-    # 这里可能会报错，如果报错，我们会打印出详细信息
-    from news_analyzer import NewsAnalyzer, generate_static_api_files
-    HAS_ANALYZER = True
-    print(">>> DEBUG: 成功导入 NewsAnalyzer")
-except Exception as e:
-    print("!!! 严重错误：无法导入 NewsAnalyzer")
-    traceback.print_exc() # 这会打印详细的报错原因
-    HAS_ANALYZER = False
+def get_news_data():
+    """
+    这里是你获取新闻数据的地方。
+    目前我放了一个测试数据，保证程序能跑通。
+    后续你可以把你真正的爬虫代码逻辑写在这里。
+    """
+    # 示例数据
+    return [
+        {"source": "测试源", "title": "这是一个测试新闻，请在此处替换为你的真实数据获取逻辑"}
+    ]
 
 def run_ai_workflow():
-    print(">>> 调试：开始 AI 智能分析工作流")
+    print(">>> 调试：开始纯净版 AI 工作流")
     
-    if not HAS_ANALYZER:
-        print("!!! 严重错误：由于导入失败，无法获取新闻数据。请检查文件名。")
+    # 1. 获取数据
+    raw_data = get_news_data()
+    print(f">>> 调试：获取到 {len(raw_data)} 条新闻")
+    
+    # 2. AI 分析
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        print("!!! 错误：未配置 GEMINI_API_KEY")
         return
+        
+    print(">>> 调试：正在调用 AI 进行分析...")
+    ranked_news = analyze_and_rank(raw_data, api_key)
+    print(f">>> 调试：AI 分析完成，返回 {len(ranked_news)} 条精选新闻")
     
-    try:
-        analyzer = NewsAnalyzer()
-        print(">>> 调试：正在获取新闻数据...")
-        raw_data = analyzer.get_all_news()
-        print(f">>> 调试：获取到 {len(raw_data)} 条新闻")
-        
-        if not raw_data:
-            print("警告：没有获取到任何新闻数据。")
-            return
-            
-        # 2. AI 分析
-        api_key = os.getenv('GEMINI_API_KEY')
-        ranked_news = analyze_and_rank(raw_data, api_key)
-        
-        # 3. 发送邮件
-        if ranked_news:
+    # 3. 发送邮件
+    if ranked_news:
+        print(">>> 调试：正在发送邮件...")
+        try:
             send_email({}, ranked_news)
-        else:
-            print("警告：AI 返回为空")
-            
-    except Exception as e:
-        print(f"!!! 流程出错 -> {e}")
-        traceback.print_exc()
+            print(">>> 调试：邮件发送成功！")
+        except Exception as e:
+            print(f"!!! 邮件发送失败: {e}")
+    else:
+        print("警告：AI 返回为空，没有精选新闻。")
 
 def main():
+    # 只要运行 python main.py --run-ai，就会执行上面的工作流
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-ai', action='store_true')
     args = parser.parse_args()
@@ -65,10 +57,7 @@ def main():
     if args.run_ai:
         run_ai_workflow()
     else:
-        # 原有逻辑
-        if HAS_ANALYZER:
-            analyzer = NewsAnalyzer()
-            analyzer.run()
+        print("请使用 python main.py --run-ai 来启动工作流")
 
 if __name__ == "__main__":
     main()
