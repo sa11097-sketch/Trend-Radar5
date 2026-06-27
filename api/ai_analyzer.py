@@ -1,6 +1,6 @@
+# api/ai_analyzer.py (修复版)
 import google.generativeai as genai
 import json
-import os
 
 def analyze_and_rank(news_list, api_key):
     """使用 Gemini 分析并筛选出最有价值的财经新闻"""
@@ -9,12 +9,12 @@ def analyze_and_rank(news_list, api_key):
         return []
         
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash') # 建议使用最新版本模型
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
-    # 简化新闻列表，仅取标题和来源
+    # 简化新闻列表
     summary_input = "\n".join([f"[{i}] [{n.get('source', '未知')}] {n.get('title', '')}" for i, n in enumerate(news_list[:30])])
     
-    # 使用 .format() 填充变量，而不是直接使用 f-string，可以避免 {} 冲突
+    # 修复点：将 JSON 中的 {} 转义为 {{ }}，这样 .format() 就会忽略它们
     template = """
     你是一名专业财经情报分析师，负责为高管提供决策支持。
     关注核心领域：国资动态、国企改革、汇率、大宗商品、半导体、AI、生物医药、跨境贸易、国际宏观。
@@ -25,13 +25,14 @@ def analyze_and_rank(news_list, api_key):
     输出要求：严格返回 JSON 数组格式，不要 Markdown，不要解释。
     格式如下：
     [
-      {"title": "新闻标题", "score": 9, "insight": "简洁点评"}
+      {{"title": "新闻标题", "score": 9, "insight": "简洁点评"}}
     ]
     
     新闻列表：
     {news_content}
     """
     
+    # 这里我们只对 {news_content} 进行替换，其他 {{ }} 会被保留为 { }
     prompt = template.format(news_content=summary_input)
     
     try:
