@@ -1,32 +1,43 @@
-# api/ai_analyzer.py (覆盖版)
 import google.generativeai as genai
 import json
+import os
 
 def analyze_and_rank(news_list, api_key):
+    """使用 Gemini 分析并筛选出最有价值的财经新闻"""
+    if not api_key:
+        print("API Key 未配置，跳过 AI 分析")
+        return []
+        
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash') # 建议使用最新版本模型
 
-    # 将数据打包，并要求 AI 进行筛选
-    summary_input = "\n".join([f"[{n.get('source')}] {n.get('title')}" for n in news_list])
+    # 简化新闻列表，仅取标题和来源
+    summary_input = "\n".join([f"[{i}] [{n.get('source', '未知')}] {n.get('title', '')}" for i, n in enumerate(news_list[:30])])
     
-    prompt = f"""
-    你是高管情报助手。
-    任务：从以下新闻中筛选最有价值的前6条。
-    过滤原则：
-    1. 必须是12小时内的重要动态。
-    2. 关注领域：国资/国企改革/宏观政策/大宗商品/AI/生物医药。
-    3. 严格按重要性(0-10分)排序，仅返回得分最高的前6条。
+    # 使用 .format() 填充变量，而不是直接使用 f-string，可以避免 {} 冲突
+    template = """
+    你是一名专业财经情报分析师，负责为高管提供决策支持。
+    关注核心领域：国资动态、国企改革、汇率、大宗商品、半导体、AI、生物医药、跨境贸易、国际宏观。
     
-    输出要求：严格的 JSON 数组，格式为 [{"title": "...", "score": 9, "insight": "..."}]。不要Markdown标记。
+    请从以下新闻列表中，挑选出最具价值、前瞻性且对上述领域影响最大的前6条。
+    请按重要性打分(0-10分)，并给出简短的专业点评。
     
-    新闻：
-    {summary_input}
+    输出要求：严格返回 JSON 数组格式，不要 Markdown，不要解释。
+    格式如下：
+    [
+      {"title": "新闻标题", "score": 9, "insight": "简洁点评"}
+    ]
+    
+    新闻列表：
+    {news_content}
     """
     
-    response = model.generate_content(prompt)
+    prompt = template.format(news_content=summary_input)
+    
     try:
-        # 强制处理可能的 Markdown 包裹
-        content = response.text.replace('```json', '').replace('```', '')
+        response = model.generate_content(prompt)
+        content = response.text.replace('```json', '').replace('```', '').strip()
         return json.loads(content)
-    except:
+    except Exception as e:
+        print(f"AI 分析出错: {e}")
         return []
