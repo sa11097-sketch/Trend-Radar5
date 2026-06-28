@@ -9,7 +9,7 @@ def analyze_and_rank(news_list, api_key):
         return []
         
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 
     # 简化新闻列表
     summary_input = "\n".join([f"[{i}] [{n.get('source', '未知')}] {n.get('title', '')}" for i, n in enumerate(news_list[:30])])
