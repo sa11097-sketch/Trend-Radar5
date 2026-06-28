@@ -20,8 +20,17 @@ def send_email(config, ranked_news):
     
     # 构建邮件正文
     body = "今日精选财经情报（AI 辅助筛选）：\n\n"
+    
+    # 使用增强后的循环逻辑，加入来源与时间
     for item in ranked_news:
-        body += f"【{item.get('score')}分】{item.get('title')}\n点评：{item.get('insight')}\n\n"
+        score = item.get('score', 'N/A')
+        title = item.get('title', '无标题')
+        source = item.get('source', '未知来源')
+        time_val = item.get('time', '未知时间')
+        insight = item.get('insight', '暂无点评')
+        
+        body += f"【{score}分】{title} (来源: {source} | 时间: {time_val})\n"
+        body += f"点评：{insight}\n\n"
     
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
     
