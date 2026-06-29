@@ -17,7 +17,7 @@ def analyze_and_rank(news_list, api_key):
     
     【核心要求】：
     1. 必须将所有内容翻译为中文，点评也必须使用中文。
-    2. 输出的 JSON 格式必须包含：source（来源）、time（时间）、title（中文标题）、score（0-10）、insight（中文点评）。
+    2. 输出的 JSON 格式必须包含：source（来源）、time（时间）、title（中文标题）、score（0-10）、insight（精华点评，70汉字以内，对国内宏观面影响）。
     3. 输出要求：严格返回 JSON 数组，不包含任何 Markdown 标记。
     
     新闻列表：
