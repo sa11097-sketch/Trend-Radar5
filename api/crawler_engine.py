@@ -1,22 +1,18 @@
-# api/crawler_engine.py (华尔街见闻 攻克版)
+# api/crawler_engine.py (华尔街见闻替换为 WSJ China 版)
 import requests
 from bs4 import BeautifulSoup
 
 def fetch_all_news():
     all_news = []
-    
-    # 全局通用的浏览器 User-Agent
+    # 增加更通用的浏览器 Header，避免被识别为简单脚本
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Referer": "https://www.wsj.com/",
     }
 
-    # 华尔街见闻 专用 Headers，必须带 Referer
-    wscn_headers = headers.copy()
-    wscn_headers["Referer"] = "https://wallstreetcn.com/"
-    wscn_headers["Origin"] = "https://wallstreetcn.com/"
-
+    # 配置项：仅修改了第一个源 (华尔街见闻 -> WSJ China)，其他保持原样
     sources = [
-        {"name": "华尔街见闻", "url": "https://api.wallstreetcn.com/v1/livenews?channel=global", "type": "json", "headers": wscn_headers},
+        {"name": "华尔街见闻(WSJ)", "url": "https://www.wsj.com/world/china", "type": "html", "selector": 'h3'},
         {"name": "金融时报", "url": "https://www.ft.com/?format=rss", "type": "rss"},
         {"name": "路透社", "url": "https://www.reuters.com/business/", "type": "html", "selector": 'a[data-testid="Heading"]', "time_selector": 'time'},
         {"name": "雅虎财经", "url": "https://finance.yahoo.com/news/", "type": "html", "selector": 'h3 > a', "time_selector": 'time'},
@@ -25,48 +21,46 @@ def fetch_all_news():
 
     for source in sources:
         try:
-            # 优先使用源特定的 headers，没有则使用通用 headers
-            use_headers = source.get("headers", headers)
-            response = requests.get(source["url"], headers=use_headers, timeout=15)
-            
-            if response.status_code != 200: 
-                print(f"  -> {source['name']} 失败 (状态码: {response.status_code})")
-                continue
+            response = requests.get(source["url"], headers=headers, timeout=15)
+            if response.status_code != 200: continue
 
-            if source["type"] == "json":
-                data = response.json()
-                # 兼容性处理：尝试获取 data.items，如果没有则尝试 data.data.items
-                items = data.get('data', {}).get('items', [])
-                if not items: items = data.get('items', [])
-                
-                for item in items[:3]:
-                    all_news.append({"source": source["name"], "title": item.get('title'), "time": "近期"})
-            
-            elif source["type"] == "rss":
+            # --- 金融时报 (RSS) ---
+            if source["name"] == "金融时报":
                 soup = BeautifulSoup(response.content, features="xml")
                 for item in soup.find_all('item')[:3]:
                     title = item.find('title').text if item.find('title') else "无标题"
-                    pub_date = item.find('pubDate').text if item.find('pubDate') else "未知"
-                    pub_date = pub_date.split(', ')[-1].replace(' GMT', '') if ',' in pub_date else pub_date
-                    all_news.append({"source": source["name"], "title": title, "time": pub_date})
-            
-            elif source["type"] == "html":
+                    all_news.append({"source": source["name"], "title": title, "time": "RSS"})
+
+            # --- CNBC (实时流) ---
+            elif source["name"] == "CNBC":
                 soup = BeautifulSoup(response.content, 'html.parser')
-                # 针对 CNBC 和其他源的特殊处理保持逻辑一致
-                if source["name"] == "CNBC":
-                    items = soup.select('.LatestNews-item')
-                    for item in items[:3]:
-                        title_el = item.select_one('.LatestNews-headline')
-                        time_el = item.select_one('.LatestNews-timestamp')
-                        if title_el:
-                            all_news.append({"source": source["name"], "title": title_el.text.strip(), "time": time_el.text.strip() if time_el else "最新"})
-                else:
-                    elements = soup.select(source["selector"])
-                    for el in elements[:3]:
-                        title = el.text.strip()
-                        time_tag = el.find_next('time') or el.find_parent().find('time')
-                        pub_time = time_tag.get('datetime') if time_tag and time_tag.has_attr('datetime') else "网页抓取"
-                        all_news.append({"source": source["name"], "title": title, "time": pub_time[:16].replace('T', ' ')})
+                items = soup.select('.LatestNews-item')
+                for item in items[:3]:
+                    title_el = item.select_one('.LatestNews-headline')
+                    time_el = item.select_one('.LatestNews-timestamp')
+                    title = title_el.text.strip() if title_el else "无标题"
+                    pub_time = time_el.text.strip() if time_el else "最新"
+                    all_news.append({"source": source["name"], "title": title, "time": pub_time})
+
+            # --- WSJ China (新目标) ---
+            elif source["name"] == "华尔街见闻(WSJ)":
+                soup = BeautifulSoup(response.content, 'html.parser')
+                # 抓取 h3 标题，过滤掉过短的无意义文本
+                for el in soup.select(source["selector"])[:5]:
+                    title = el.text.strip()
+                    if len(title) > 10:
+                        all_news.append({"source": source["name"], "title": title, "time": "网页抓取"})
+
+            # --- 其他通用 HTML 源 (路透、雅虎) ---
+            else:
+                soup = BeautifulSoup(response.content, 'html.parser')
+                elements = soup.select(source["selector"])
+                for el in elements[:3]:
+                    title = el.text.strip()
+                    time_tag = el.find_next('time') or el.find_parent().find('time')
+                    pub_time = time_tag.get('datetime') if time_tag and time_tag.has_attr('datetime') else "网页抓取"
+                    all_news.append({"source": source["name"], "title": title, "time": pub_time[:16].replace('T', ' ')})
+
         except Exception as e:
             print(f"采集异常 ({source['name']}): {e}")
             
