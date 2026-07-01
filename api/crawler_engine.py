@@ -1,4 +1,4 @@
-# api/crawler_engine.py (24小时严控版)
+# api/crawler_engine.py (全源标准化版)
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
@@ -10,6 +10,7 @@ def fetch_all_news():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     }
 
+    # 源配置：华尔街、路透、雅虎采用 RSS 标准化源，FT 原版 RSS，CNBC 原版 HTML
     sources = [
         {"name": "华尔街日报", "url": "https://news.google.com/rss/search?q=site:wsj.com+china&hl=zh-CN&gl=CN&ceid=CN:zh-Hans", "type": "rss"},
         {"name": "路透社", "url": "https://news.google.com/rss/search?q=site:reuters.com+business&hl=zh-CN&gl=CN&ceid=CN:zh-Hans", "type": "rss"},
@@ -18,7 +19,6 @@ def fetch_all_news():
         {"name": "CNBC", "url": "https://www.cnbc.com/latest/", "type": "html", "selector": '.LatestNews-headline', "time_selector": '.LatestNews-timestamp'}
     ]
 
-    # 严控 24 小时新鲜度
     time_threshold = datetime.now(timezone.utc) - timedelta(hours=24)
 
     for source in sources:
@@ -26,7 +26,7 @@ def fetch_all_news():
             response = requests.get(source["url"], headers=headers, timeout=15)
             if response.status_code != 200: continue
 
-            # 1. 统一 RSS 处理逻辑 (已应用 24 小时过滤)
+            # 1. 统一 RSS 处理逻辑 (华尔街日报、路透社、雅虎财经、金融时报)
             if source["type"] == "rss":
                 soup = BeautifulSoup(response.content, features="xml")
                 items = soup.find_all('item')
@@ -36,17 +36,14 @@ def fetch_all_news():
                     pub_date_str = item.find('pubDate').text if item.find('pubDate') else None
                     if pub_date_str:
                         pub_date = parsedate_to_datetime(pub_date_str)
-                        # 如果没有时区信息，强制赋予 UTC
-                        if pub_date.tzinfo is None: pub_date = pub_date.replace(tzinfo=timezone.utc)
-                        
-                        if pub_date >= time_threshold:
+                        if pub_date > time_threshold:
                             filtered_items.append({"title": title, "pub_date": pub_date})
                 
                 filtered_items.sort(key=lambda x: x['pub_date'], reverse=True)
                 for item in filtered_items[:3]:
                     all_news.append({"source": source["name"], "title": item['title'], "time": item['pub_date'].strftime('%m-%d %H:%M')})
 
-            # 2. CNBC 原生逻辑 (保持完全不动)
+            # 2. CNBC 原生逻辑 (严格保持不动)
             elif source["name"] == "CNBC":
                 soup = BeautifulSoup(response.content, 'html.parser')
                 items = soup.select('.LatestNews-item')
