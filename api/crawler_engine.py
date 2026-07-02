@@ -19,7 +19,7 @@ def fetch_all_news():
         {"name": "CNBC", "url": "https://www.cnbc.com/latest/", "type": "html", "selector": '.LatestNews-headline', "time_selector": '.LatestNews-timestamp'}
     ]
 
-    time_threshold = datetime.now(timezone.utc) - timedelta(hours=48)
+    time_threshold = datetime.now(timezone.utc) - timedelta(hours=24)
 
     for source in sources:
         try:
