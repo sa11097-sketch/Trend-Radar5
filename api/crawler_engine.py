@@ -1,4 +1,4 @@
-# api/crawler_engine.py (全源标准化版)
+# api/crawler_engine.py (全源均衡版)
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
@@ -10,7 +10,7 @@ def fetch_all_news():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     }
 
-    # 源配置：华尔街、路透、雅虎采用 RSS 标准化源，FT 原版 RSS，CNBC 原版 HTML
+    # 保持原有配置框架不动
     sources = [
         {"name": "华尔街日报", "url": "https://news.google.com/rss/search?q=site:wsj.com+china&hl=zh-CN&gl=CN&ceid=CN:zh-Hans", "type": "rss"},
         {"name": "路透社", "url": "https://news.google.com/rss/search?q=site:reuters.com+business&hl=zh-CN&gl=CN&ceid=CN:zh-Hans", "type": "rss"},
@@ -19,7 +19,7 @@ def fetch_all_news():
         {"name": "CNBC", "url": "https://www.cnbc.com/latest/", "type": "html", "selector": '.LatestNews-headline', "time_selector": '.LatestNews-timestamp'}
     ]
 
-    time_threshold = datetime.now(timezone.utc) - timedelta(hours=24)
+    time_threshold = datetime.now(timezone.utc) - timedelta(hours=48)
 
     for source in sources:
         try:
@@ -40,14 +40,18 @@ def fetch_all_news():
                             filtered_items.append({"title": title, "pub_date": pub_date})
                 
                 filtered_items.sort(key=lambda x: x['pub_date'], reverse=True)
-                for item in filtered_items[:3]:
+                
+                # 【修改点】：将 [:3] 修改为 [:2]，确保每家媒体最多贡献 2 条
+                for item in filtered_items[:2]:
                     all_news.append({"source": source["name"], "title": item['title'], "time": item['pub_date'].strftime('%m-%d %H:%M')})
 
             # 2. CNBC 原生逻辑 (严格保持不动)
             elif source["name"] == "CNBC":
                 soup = BeautifulSoup(response.content, 'html.parser')
                 items = soup.select('.LatestNews-item')
-                for item in items[:3]:
+                
+                # 【修改点】：同样将 [:3] 修改为 [:2]
+                for item in items[:2]:
                     title_el = item.select_one('.LatestNews-headline')
                     time_el = item.select_one('.LatestNews-timestamp')
                     title = title_el.text.strip() if title_el else "无标题"
